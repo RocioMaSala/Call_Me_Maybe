@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Entornos virtuales
+.venv/
+venv/
+
+# Caché de herramientas de linting/type-checking
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Salida generada (el PDF pide no incluirla en el repo)
+data/output/
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
