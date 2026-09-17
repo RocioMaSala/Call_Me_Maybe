@@ -1,6 +1,18 @@
-from parser import loading_function_calling_test
-from parser import loading_function_definitions
+from llm_sdk import Small_LLM_Model
+from tokenizer_utils import load_vocab
+from masking import mask_boolean
 
-loading_function_calling_test("data/input/function_calling_tests.json")
-loading_function_definitions("data/input/functions_definition.json")
+model = Small_LLM_Model()
+vocab = load_vocab(model)
 
+prompt = "Is the sky green? Answer with true or false."
+input_ids = model.encode(prompt).tolist()[0]
+
+logits = model.get_logits_from_input_ids(input_ids)
+true_id = vocab['true']
+false_id = vocab['false']
+print("Logit de 'true':", logits[true_id])
+print("Logit de 'false':", logits[false_id])
+
+valor, input_ids_actualizado = mask_boolean(input_ids, vocab, model)
+print("Valor generado:", valor)
