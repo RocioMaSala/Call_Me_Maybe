@@ -1,7 +1,7 @@
 from parser import FunctionDefinition, ParameterSchema
 
 def format_parameters(parameters: dict[str, ParameterSchema]) -> str:
-    prompt_parameters = [f"{name}: {value.type}" for name, value in parameters.items]
+    prompt_parameters = [f"{name}: {value.type}" for name, value in parameters.items()]
     return ", ".join(prompt_parameters)
 
 def format_function_compact(func: FunctionDefinition) -> str:

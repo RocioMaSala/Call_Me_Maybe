@@ -46,8 +46,8 @@ def loading_function_calling_test(path: str) -> list[FunctionCallingTest]:
                 parsed_item = FunctionCallingTest(**item)
                 tests.append(parsed_item)          
             return tests
-    except FileNotFoundError:
-        print(f"Error: no se encontró el fichero {path}", file=sys.stderr)
+    except OSError as e:
+        print(e, file=sys.stderr)
         sys.exit(1)
     except json.JSONDecodeError as e:
         print(f"Error: el fichero {path} no contiene JSON válido: {e}", file=sys.stderr)

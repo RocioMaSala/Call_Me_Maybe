@@ -13,3 +13,9 @@ def build_id_to_token(vocab: dict[str, int]) -> dict[int, str]:
     return id_to_token
 
 
+def token_to_text(id_to_token: dict[int, str], token_id: int) -> str:
+    texto_crudo = id_to_token[token_id]
+    texto_limpio = texto_crudo.replace('Ġ', ' ')
+    return texto_limpio
+
+
