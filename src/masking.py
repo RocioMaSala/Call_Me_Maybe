@@ -32,6 +32,7 @@ def mask_name(
     vocab: dict[str, int],
     model: Small_LLM_Model,
     functions: list[FunctionDefinition],
+    unknown_ids: list[int]
 ) -> tuple[str, list[int]]:
     candidatos_vivos = []
     for function in functions:
@@ -41,6 +42,8 @@ def mask_name(
     id_to_token = build_id_to_token(vocab)
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
+        for i in unknown_ids:
+            logits[i] = float('-inf')
         for texto_token, id in vocab.items():
             es_valido = False
             for candidato in candidatos_vivos:
@@ -61,7 +64,7 @@ def mask_name(
     return (texto_generado, input_ids)
 
 
-def mask_number(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model) -> tuple[str, list[int]]:
+def mask_number(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model, unknown_ids: list[int]) -> tuple[str, list[int]]:
     texto_generado = ""
     comma_id = vocab[',']
     key_id = vocab['}']
@@ -69,6 +72,8 @@ def mask_number(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Mo
     digits_ids = [id for texto, id in vocab.items() if texto.isdigit()]
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
+        for i in unknown_ids:
+            logits[i] = float('-inf')
         for texto_token, id in vocab.items():
             es_valido = False
             if id in digits_ids:
@@ -85,7 +90,7 @@ def mask_number(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Mo
     return (texto_generado, input_ids)
 
 
-def mask_string(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model) -> tuple[str, list[int]]:
+def mask_string(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model, unknown_ids: list[int]) -> tuple[str, list[int]]:
     texto_generado = ""
     comillas_id = vocab['"']
     barras_id = vocab['\\']
@@ -93,6 +98,8 @@ def mask_string(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Mo
     after_backslash = False
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
+        for i in unknown_ids:
+            logits[i] = float('-inf')
         for texto_token, id in vocab.items():
             if not after_backslash:
                 es_valido = (texto_token == '"') or (texto_token == '\\') or ('"' not in texto_token and '\\' not in texto_token)
@@ -115,5 +122,22 @@ def mask_string(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Mo
     return(texto_generado, input_ids)
 
 
-def mask_literal(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model, text: str) -> tuple[str, list[int]]:
-
+def mask_literal(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model, text: str, unknown_ids: list[int]) -> tuple[str, list[int]]:
+    id_to_token = build_id_to_token(vocab)
+    texto_generado = ""
+    while texto_generado != text:
+        logits = model.get_logits_from_input_ids(input_ids)
+        for i in unknown_ids:
+            logits[i] = float('-inf')
+        resto_esperando = text[len(texto_generado):]
+        for texto_token, id in vocab.items():
+            es_valido = False
+            texto_token_clean = token_to_text(id_to_token, id)
+            if len(texto_token_clean) > 0 and resto_esperando.startswith(texto_token_clean):
+                es_valido = True
+            if not es_valido:
+                logits[id] = float('-inf')
+        winner_id = int(np.argmax(logits))
+        texto_generado += token_to_text(id_to_token, winner_id)
+        input_ids.append(winner_id)
+    return (texto_generado, input_ids)

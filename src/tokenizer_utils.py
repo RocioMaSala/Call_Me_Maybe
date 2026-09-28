@@ -19,3 +19,7 @@ def token_to_text(id_to_token: dict[int, str], token_id: int) -> str:
     return texto_limpio
 
 
+def build_unknown_ids(id_to_token: dict[int, str], logits_size: int) -> list[int]:
+    unknown_ids = [i for i in range(logits_size) if i not in id_to_token]
+    return unknown_ids
+    
