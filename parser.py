@@ -37,6 +37,9 @@ def loading_function_definitions(path: str) -> list[FunctionDefinition]:
         print(f"Error: el fichero {path} no cumple el formato esperado: {e}", file=sys.stderr)
         sys.exit(1)
 
+def build_name_to_def(definitions: list[FunctionDefinition]) -> dict[str, FunctionDefinition]:
+    return {func.name: func for func in definitions}
+
 def loading_function_calling_test(path: str) -> list[FunctionCallingTest]:
     try:
         with open(path, "r", encoding="utf-8") as f:

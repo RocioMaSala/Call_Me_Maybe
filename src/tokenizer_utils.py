@@ -16,10 +16,11 @@ def build_id_to_token(vocab: dict[str, int]) -> dict[int, str]:
 def token_to_text(id_to_token: dict[int, str], token_id: int) -> str:
     texto_crudo = id_to_token[token_id]
     texto_limpio = texto_crudo.replace('Ġ', ' ')
+    texto_limpio = texto_limpio.replace('Ċ', '\n')
     return texto_limpio
 
 
 def build_unknown_ids(id_to_token: dict[int, str], logits_size: int) -> list[int]:
     unknown_ids = [i for i in range(logits_size) if i not in id_to_token]
     return unknown_ids
-    
+
