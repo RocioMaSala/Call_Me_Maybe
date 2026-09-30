@@ -1,7 +1,7 @@
-from tokenizer_utils import token_to_text, build_id_to_token
 import numpy as np
+from .tokenizer_utils import token_to_text, build_id_to_token
 from llm_sdk import Small_LLM_Model
-from parser import FunctionDefinition
+from .parser import FunctionDefinition
 
 
 def list_creation(logits: list[float]) -> list[float]:

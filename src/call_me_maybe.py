@@ -1,9 +1,9 @@
 from llm_sdk import Small_LLM_Model
-from tokenizer_utils import load_vocab, build_id_to_token, build_unknown_ids
-from masking import mask_number, mask_string, mask_name, mask_boolean, mask_literal
-from prompting import build_prompt_compact
-from parser import loading_function_definitions, build_name_to_def, FunctionDefinition, FunctionCallingTest
-from json_utils import escape_json_string
+from .tokenizer_utils import load_vocab, build_id_to_token, build_unknown_ids
+from .masking import mask_number, mask_string, mask_name, mask_boolean, mask_literal
+from .prompting import build_prompt_compact
+from .parser import loading_function_definitions, build_name_to_def, FunctionDefinition, FunctionCallingTest, loading_function_calling_test
+from .json_utils import escape_json_string
 import json
 import argparse
 
@@ -82,7 +82,6 @@ def escribir_resultados(resultados: list[dict], ruta_salida: str) -> None:
     with open(ruta_salida, "w", encoding="utf-8") as f:
         json.dump(resultados, f)
 
-import argparse
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Function calling con constrained decoding")
@@ -114,21 +113,18 @@ def main() -> None:
     vocab = load_vocab(model)
     id_to_token = build_id_to_token(vocab)
 
-    # HUECO 1: calcular unknown_ids (necesitas logits_size primero)
-    ???
+    probe_ids = model.encode("Test").tolist()[0]
+    logits_size = len(model.get_logits_from_input_ids(probe_ids))
+    unknown_ids = build_unknown_ids(id_to_token, logits_size)
 
-    # HUECO 2: cargar definitions y tests, usando las rutas de args
-    ???
+    definitions = loading_function_definitions(args.functions_definition)
+    tests = loading_function_calling_test(args.input)
 
-    # HUECO 3: construir name_to_def
-    ???
+    name_to_def = build_name_to_def(definitions)
 
-    # HUECO 4: procesar todos los prompts
-    ???
+    resultados = procesar_todos_los_prompts(tests, definitions, name_to_def, vocab, model, unknown_ids)
 
-    # HUECO 5: escribir el resultado
-    ???
-
+    escribir_resultados(resultados, args.output)
 
 
 if __name__ == "__main__":

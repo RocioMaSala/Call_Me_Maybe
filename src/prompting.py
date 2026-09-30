@@ -1,4 +1,4 @@
-from parser import FunctionDefinition, ParameterSchema
+from .parser import FunctionDefinition, ParameterSchema
 
 def format_parameters(parameters: dict[str, ParameterSchema]) -> str:
     prompt_parameters = [f"{name}: {value.type}" for name, value in parameters.items()]
