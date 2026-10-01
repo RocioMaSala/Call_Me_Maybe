@@ -1,5 +1,14 @@
 from .parser import FunctionDefinition, ParameterSchema
 
+def add_json_instruction(prompt: str) -> str:
+    instruccion = (
+        "\n\nRespond with a single JSON object, with no text before or after it.\n"
+        "Example:\n"
+        'User request: What is the sum of 10 and 20?\n'
+        'Response: {"prompt": "What is the sum of 10 and 20?", "name": "fn_example_function", "parameters": {"param1": 10, "param2": 20}}\n'
+    )
+    return prompt + instruccion
+
 def format_parameters(parameters: dict[str, ParameterSchema]) -> str:
     prompt_parameters = [f"{name}: {value.type}" for name, value in parameters.items()]
     return ", ".join(prompt_parameters)

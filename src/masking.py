@@ -42,6 +42,8 @@ def mask_name(
     id_to_token = build_id_to_token(vocab)
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
+        indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
+        top_8 = indices_ordenados[:8]
         for i in unknown_ids:
             logits[i] = float('-inf')
         for texto_token, id in vocab.items():
@@ -72,21 +74,27 @@ def mask_number(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Mo
     digits_ids = [id for texto, id in vocab.items() if texto.isdigit()]
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
-        for i in unknown_ids:
-            logits[i] = float('-inf')
-        for texto_token, id in vocab.items():
+        indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
+        top_8 = indices_ordenados[:8]
+
+        winner_id = None
+        for candidato_id in top_8:
             es_valido = False
-            if id in digits_ids:
-                es_valido = True
-            if len(texto_generado) > 0 and (id == comma_id or id == key_id):
-                es_valido = True
-            if not es_valido:
-                logits[id] = float('-inf')
-        winner_id = int(np.argmax(logits))
+            if candidato_id not in unknown_ids:
+                if candidato_id in digits_ids:
+                    es_valido = True
+                if len(texto_generado) > 0 and (candidato_id == comma_id or candidato_id == key_id):
+                    es_valido = True
+            if es_valido:
+                winner_id = candidato_id
+                break
+        if winner_id is None:
+            raise ValueError("El modelo no proporcionó una respuesta válida entre los 8 candidatos más probables para un número")
         if (winner_id == key_id or winner_id == comma_id) and len(texto_generado) > 0:
             break
         texto_generado += token_to_text(id_to_token, winner_id)
         input_ids.append(winner_id)
+
     return (texto_generado, input_ids)
 
 
@@ -127,17 +135,24 @@ def mask_literal(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_M
     texto_generado = ""
     while texto_generado != text:
         logits = model.get_logits_from_input_ids(input_ids)
-        for i in unknown_ids:
-            logits[i] = float('-inf')
-        resto_esperando = text[len(texto_generado):]
-        for texto_token, id in vocab.items():
+        resto_esperado = text[len(texto_generado):]
+        indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
+        top_8 = indices_ordenados[:8]
+        winner_id = None
+        for candidato_id in top_8:
             es_valido = False
-            texto_token_clean = token_to_text(id_to_token, id)
-            if len(texto_token_clean) > 0 and resto_esperando.startswith(texto_token_clean):
-                es_valido = True
-            if not es_valido:
-                logits[id] = float('-inf')
-        winner_id = int(np.argmax(logits))
+            if candidato_id not in unknown_ids:
+                texto_candidato = token_to_text(id_to_token, candidato_id)
+                if len(texto_candidato) > 0 and resto_esperado.startswith(texto_candidato):
+                    es_valido = True
+                if es_valido:
+                    winner_id = candidato_id
+                    break
+
+        if winner_id is None:
+            raise ValueError(f"El modelo no proporcionó una respuesta válida entre los 8 candidatos más probables para el literal: {text!r}")
+
         texto_generado += token_to_text(id_to_token, winner_id)
         input_ids.append(winner_id)
+
     return (texto_generado, input_ids)

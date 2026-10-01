@@ -1,7 +1,7 @@
 from llm_sdk import Small_LLM_Model
 from .tokenizer_utils import load_vocab, build_id_to_token, build_unknown_ids
 from .masking import mask_number, mask_string, mask_name, mask_boolean, mask_literal
-from .prompting import build_prompt_compact
+from .prompting import build_prompt_compact, add_json_instruction
 from .parser import loading_function_definitions, build_name_to_def, FunctionDefinition, FunctionCallingTest, loading_function_calling_test
 from .json_utils import escape_json_string
 import json
@@ -16,7 +16,7 @@ def generar_json_para_prompt (
         model: Small_LLM_Model,
         unknown_ids: list[int]
         ) -> dict[str, object]:
-    contexto = build_prompt_compact(prompt, definitions)
+    contexto = add_json_instruction(build_prompt_compact(prompt, definitions))
     input_ids = model.encode(contexto).tolist()[0]
     json_acumulado = ""
 
