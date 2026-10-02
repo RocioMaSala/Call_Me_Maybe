@@ -75,10 +75,10 @@ def mask_number(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Mo
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
         indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
-        top_8 = indices_ordenados[:8]
+        top_30 = indices_ordenados[:30]
 
         winner_id = None
-        for candidato_id in top_8:
+        for candidato_id in top_30:
             es_valido = False
             if candidato_id not in unknown_ids:
                 if candidato_id in digits_ids:
@@ -137,9 +137,9 @@ def mask_literal(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_M
         logits = model.get_logits_from_input_ids(input_ids)
         resto_esperado = text[len(texto_generado):]
         indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
-        top_8 = indices_ordenados[:8]
+        top_30 = indices_ordenados[:30]
         winner_id = None
-        for candidato_id in top_8:
+        for candidato_id in top_30:
             es_valido = False
             if candidato_id not in unknown_ids:
                 texto_candidato = token_to_text(id_to_token, candidato_id)
@@ -150,7 +150,11 @@ def mask_literal(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_M
                     break
 
         if winner_id is None:
-            raise ValueError(f"El modelo no proporcionó una respuesta válida entre los 8 candidatos más probables para el literal: {text!r}")
+            raise ValueError(
+                f"El modelo no proporcionó una respuesta válida entre los 8 candidatos más probables. "
+                f"Literal completo: {text!r}. Progreso alcanzado: {texto_generado!r}. "
+                f"Resto esperado en el momento del fallo: {resto_esperado!r}"
+            )
 
         texto_generado += token_to_text(id_to_token, winner_id)
         input_ids.append(winner_id)
