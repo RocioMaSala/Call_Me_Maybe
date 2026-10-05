@@ -24,3 +24,7 @@ def build_unknown_ids(id_to_token: dict[int, str], logits_size: int) -> list[int
     unknown_ids = [i for i in range(logits_size) if i not in id_to_token]
     return unknown_ids
 
+
+def build_id_to_text(id_to_token: dict[int, str]) -> dict[int, str]:
+    return {id: token_to_text(id_to_token, id) for id in id_to_token}
+

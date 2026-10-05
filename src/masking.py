@@ -66,33 +66,31 @@ def mask_name(
     return (texto_generado, input_ids)
 
 
-def mask_number(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model, unknown_ids: list[int]) -> tuple[str, list[int]]:
+def mask_number(
+    input_ids: list[int],
+    vocab: dict[str, int],
+    model: Small_LLM_Model,
+    id_to_text: dict[int, str],
+) -> tuple[str, list[int]]:
     texto_generado = ""
     comma_id = vocab[',']
     key_id = vocab['}']
-    id_to_token = build_id_to_token(vocab)
-    digits_ids = [id for texto, id in vocab.items() if texto.isdigit()]
+    digits_ids = [id for texto, id in vocab.items() if texto.isascii() and texto.isdigit()]
+
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
-        indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
-        top_30 = indices_ordenados[:30]
+        mask = list_creation(logits)
 
-        winner_id = None
-        for candidato_id in top_30:
-            es_valido = False
-            if candidato_id not in unknown_ids:
-                if candidato_id in digits_ids:
-                    es_valido = True
-                if len(texto_generado) > 0 and (candidato_id == comma_id or candidato_id == key_id):
-                    es_valido = True
-            if es_valido:
-                winner_id = candidato_id
-                break
-        if winner_id is None:
-            raise ValueError("El modelo no proporcionó una respuesta válida entre los 8 candidatos más probables para un número")
-        if (winner_id == key_id or winner_id == comma_id) and len(texto_generado) > 0:
+        for id in digits_ids:
+            mask[id] = logits[id]
+        if len(texto_generado) > 0:
+            mask[comma_id] = logits[comma_id]
+            mask[key_id] = logits[key_id]
+
+        winner_id = int(np.argmax(mask))
+        if winner_id == comma_id or winner_id == key_id:
             break
-        texto_generado += token_to_text(id_to_token, winner_id)
+        texto_generado += id_to_text[winner_id]
         input_ids.append(winner_id)
 
     return (texto_generado, input_ids)
@@ -130,33 +128,29 @@ def mask_string(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Mo
     return(texto_generado, input_ids)
 
 
-def mask_literal(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model, text: str, unknown_ids: list[int]) -> tuple[str, list[int]]:
-    id_to_token = build_id_to_token(vocab)
+def mask_literal(
+    input_ids: list[int],
+    model: Small_LLM_Model,
+    text: str,
+    id_to_text: dict[int, str],
+) -> tuple[str, list[int]]:
     texto_generado = ""
+
     while texto_generado != text:
         logits = model.get_logits_from_input_ids(input_ids)
+        mask = list_creation(logits)
         resto_esperado = text[len(texto_generado):]
-        indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
-        top_30 = indices_ordenados[:30]
-        winner_id = None
-        for candidato_id in top_30:
-            es_valido = False
-            if candidato_id not in unknown_ids:
-                texto_candidato = token_to_text(id_to_token, candidato_id)
-                if len(texto_candidato) > 0 and resto_esperado.startswith(texto_candidato):
-                    es_valido = True
-                if es_valido:
-                    winner_id = candidato_id
-                    break
 
-        if winner_id is None:
+        for id, texto_candidato in id_to_text.items():
+            if texto_candidato and resto_esperado.startswith(texto_candidato):
+                mask[id] = logits[id]
+
+        winner_id = int(np.argmax(mask))
+        if mask[winner_id] == float('-inf'):
             raise ValueError(
-                f"El modelo no proporcionó una respuesta válida entre los 8 candidatos más probables. "
-                f"Literal completo: {text!r}. Progreso alcanzado: {texto_generado!r}. "
-                f"Resto esperado en el momento del fallo: {resto_esperado!r}"
+                f"Ningún token puede producir el resto del literal: {resto_esperado!r}"
             )
-
-        texto_generado += token_to_text(id_to_token, winner_id)
+        texto_generado += id_to_text[winner_id]
         input_ids.append(winner_id)
 
     return (texto_generado, input_ids)
