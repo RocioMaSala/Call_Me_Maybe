@@ -1,26 +1,53 @@
+import time
 from llm_sdk import Small_LLM_Model
-from src.tokenizer_utils import load_vocab, build_id_to_token
+from src.tokenizer_utils import (
+    load_vocab,
+    build_id_to_token,
+    build_id_to_text,
+    build_unknown_ids,
+)
+from src.parser import loading_function_definitions, build_name_to_def
 from src.prompting import build_prompt_compact, add_json_instruction
+from src.call_me_maybe import generar_json_para_prompt
 
 model = Small_LLM_Model()
 vocab = load_vocab(model)
 id_to_token = build_id_to_token(vocab)
-
-from src.parser import loading_function_definitions
+id_to_text = build_id_to_text(id_to_token)
 definitions = loading_function_definitions("data/input/functions_definition.json")
+name_to_def = build_name_to_def(definitions)
 
-contexto = add_json_instruction(build_prompt_compact("What is the sum of 2 and 3?", definitions))
-contexto += '{\n '  # el progreso que ya sabemos que el modelo alcanzó
-input_ids = model.encode(contexto).tolist()[0]
+probe_ids = model.encode("Test").tolist()[0]
+logits_size = len(model.get_logits_from_input_ids(probe_ids))
+unknown_ids = build_unknown_ids(id_to_token, logits_size)
 
-logits = model.get_logits_from_input_ids(input_ids)
-indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
+prompt = "What is the sum of 2 and 3?"
 
-espacio_id = vocab[' '] if ' ' in vocab else None
-print("ID del espacio puro:", espacio_id)
+original = model.get_logits_from_input_ids
+stats = {"calls": 0, "seconds": 0.0}
 
-# Busca en qué posición del ranking está el espacio (o el espacio con marcador Ġ)
-for posicion, id_token in enumerate(indices_ordenados[:200]):
-    texto = id_to_token.get(id_token, "")
-    if texto.strip('Ġ') == '' and len(texto) > 0:  # es un token que, limpio, es solo espacio(s)
-        print(f"Posición {posicion}: ID {id_token}, texto {texto!r}, logit {logits[id_token]:.3f}")
+
+def medido(ids):
+    t = time.time()
+    salida = original(ids)
+    stats["calls"] += 1
+    stats["seconds"] += time.time() - t
+    return salida
+
+
+model.get_logits_from_input_ids = medido
+
+inicio = time.time()
+resultado = generar_json_para_prompt(
+    prompt, definitions, name_to_def, vocab, model, unknown_ids, id_to_text
+)
+total = time.time() - inicio
+
+contexto = add_json_instruction(build_prompt_compact(prompt, definitions))
+n_tokens = len(model.encode(contexto).tolist()[0])
+
+print(resultado)
+print(f"Llamadas al modelo: {stats['calls']}")
+print(f"Tiempo dentro del modelo: {stats['seconds']:.1f} s")
+print(f"Tiempo total: {total:.1f} s")
+print(f"Tokens del contexto inicial: {n_tokens}")
