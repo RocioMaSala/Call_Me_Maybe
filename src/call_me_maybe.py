@@ -73,14 +73,18 @@ def procesar_todos_los_prompts(
     id_to_text: dict[int, str],
 ) -> list[dict]:
     resultados = []
-    for test in tests:
+    for n, test in enumerate(tests, start=1):
+        inicio = time.time()
         try:
             resultado = generar_json_para_prompt(
                 test.prompt, definitions, name_to_def, vocab, model, unknown_ids, id_to_text
             )
             resultados.append(resultado)
+            estado = "ok"
         except Exception as e:
             resultados.append({"prompt": test.prompt, "error": str(e)})
+            estado = "ERROR"
+        print(f"[{n}/{len(tests)}] {estado} en {time.time() - inicio:.1f} s")
     return resultados
 
 def escribir_resultados(resultados: list[dict], ruta_salida: str) -> None:
