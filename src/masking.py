@@ -96,36 +96,62 @@ def mask_number(
     return (texto_generado, input_ids)
 
 
-def mask_string(input_ids: list[int], vocab: dict[str, int], model: Small_LLM_Model, unknown_ids: list[int]) -> tuple[str, list[int]]:
+MAX_STRING_TOKENS = 60
+
+
+def es_cierre(texto: str) -> bool:
+    return (
+        texto.startswith('"')
+        and '\\' not in texto
+        and '"' not in texto[1:]
+        and not any(c.isalnum() for c in texto[1:])
+    )
+
+def mask_string(
+    input_ids: list[int],
+    vocab: dict[str, int],
+    model: Small_LLM_Model,
+    unknown_ids: list[int],
+) -> tuple[str, list[int]]:
     texto_generado = ""
-    comillas_id = vocab['"']
     barras_id = vocab['\\']
     id_to_token = build_id_to_token(vocab)
     after_backslash = False
+    pasos = 0
+
     while True:
+        pasos += 1
+        if pasos > MAX_STRING_TOKENS:
+            raise ValueError(
+                f"El string superó {MAX_STRING_TOKENS} tokens sin cerrarse: "
+                f"{texto_generado!r}"
+            )
+
         logits = model.get_logits_from_input_ids(input_ids)
         for i in unknown_ids:
             logits[i] = float('-inf')
+
         for texto_token, id in vocab.items():
             if not after_backslash:
-                es_valido = (texto_token == '"') or (texto_token == '\\') or ('"' not in texto_token and '\\' not in texto_token)
-                if not es_valido:
-                    logits[id] = float('-inf')
+                es_valido = (
+                    es_cierre(texto_token)
+                    or texto_token == '\\'
+                    or ('"' not in texto_token and '\\' not in texto_token)
+                )
             else:
-                caracteres_escape_validos = ['"', '\\', '/', 'b', 'f', 'n', 'r', 't']
-                es_valido = texto_token in caracteres_escape_validos
-                if not es_valido:
-                    logits[id] = float('-inf')
+                es_valido = texto_token in ['"', '\\', '/', 'b', 'f', 'n', 'r', 't']
+            if not es_valido:
+                logits[id] = float('-inf')
+
         winner_id = int(np.argmax(logits))
-        if (winner_id == comillas_id and not after_backslash):
+        if not after_backslash and es_cierre(id_to_token[winner_id]):
             break
+
         texto_generado += token_to_text(id_to_token, winner_id)
         input_ids.append(winner_id)
-        if winner_id == barras_id:
-            after_backslash = True
-        else:
-            after_backslash = False
-    return(texto_generado, input_ids)
+        after_backslash = (winner_id == barras_id) and not after_backslash
+
+    return (texto_generado, input_ids)
 
 
 def mask_literal(

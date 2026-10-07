@@ -46,7 +46,10 @@ def generar_json_para_prompt(
         if esquema.type == "number":
             valor, input_ids = mask_number(input_ids, vocab, model, id_to_text)
         elif esquema.type == "string":
-            valor, input_ids = mask_string(input_ids, vocab, model, unknown_ids)
+            try:
+                valor, input_ids = mask_string(input_ids, vocab, model, unknown_ids)
+            except ValueError as e:
+                raise ValueError(f"Parámetro {nombre_param!r}: {e}") from e
         elif esquema.type == "boolean":
             valor, input_ids = mask_boolean(input_ids, vocab, model)
         else:
@@ -60,10 +63,14 @@ def generar_json_para_prompt(
         fragmento, input_ids = mask_literal(input_ids, model, cierre, id_to_text)
         json_acumulado += fragmento
 
-        fragmento, input_ids = mask_literal(input_ids, model, '}', id_to_text)
-        json_acumulado += fragmento
-
-    resultado = json.loads(json_acumulado)
+    fragmento, input_ids = mask_literal(input_ids, model, '}', id_to_text)
+    json_acumulado += fragmento
+    try:
+        resultado = json.loads(json_acumulado)
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"JSON inválido: {e}. Texto generado: {json_acumulado!r}"
+        ) from e
     return resultado
 
 
