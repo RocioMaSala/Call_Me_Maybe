@@ -38,6 +38,8 @@ def generar_json_para_prompt(
 
     for i, (nombre_param, esquema) in enumerate(parametros.items()):
         literal_clave = f'"{nombre_param}": '
+        if esquema.type == "string":
+            literal_clave += '"'
         fragmento, input_ids = mask_literal(input_ids, model, literal_clave, id_to_text)
         json_acumulado += fragmento
 
@@ -52,12 +54,14 @@ def generar_json_para_prompt(
         json_acumulado += valor
 
         es_ultimo = (i == total - 1)
-        literal_cierre = '}' if es_ultimo else ', '
-        fragmento, input_ids = mask_literal(input_ids, model, literal_cierre, id_to_text)
+        cierre = '}' if es_ultimo else ', '
+        if esquema.type == "string":
+            cierre = '"' + cierre
+        fragmento, input_ids = mask_literal(input_ids, model, cierre, id_to_text)
         json_acumulado += fragmento
 
-    fragmento, input_ids = mask_literal(input_ids, model, '}', id_to_text)
-    json_acumulado += fragmento
+        fragmento, input_ids = mask_literal(input_ids, model, '}', id_to_text)
+        json_acumulado += fragmento
 
     resultado = json.loads(json_acumulado)
     return resultado

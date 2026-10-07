@@ -21,7 +21,7 @@ probe_ids = model.encode("Test").tolist()[0]
 logits_size = len(model.get_logits_from_input_ids(probe_ids))
 unknown_ids = build_unknown_ids(id_to_token, logits_size)
 
-prompt = "What is the sum of 2 and 3?"
+prompt = "Reverse the string 'world'"
 
 original = model.get_logits_from_input_ids
 stats = {"calls": 0, "seconds": 0.0}
@@ -30,8 +30,10 @@ stats = {"calls": 0, "seconds": 0.0}
 def medido(ids):
     t = time.time()
     salida = original(ids)
+    dt = time.time() - t
     stats["calls"] += 1
-    stats["seconds"] += time.time() - t
+    stats["seconds"] += dt
+    print(f"llamada {stats['calls']}: {dt:.1f} s, {len(ids)} tokens", flush=True)
     return salida
 
 
