@@ -1,6 +1,6 @@
 from llm_sdk import Small_LLM_Model
 from .tokenizer_utils import load_vocab, build_id_to_text, build_id_to_token, build_unknown_ids
-from .masking import mask_number, mask_string, mask_name, mask_boolean, mask_literal
+from .masking import mask_number, mask_string, mask_name, mask_boolean, write_literal
 from .prompting import build_prompt_compact, add_json_instruction
 from .parser import loading_function_definitions, build_name_to_def, FunctionDefinition, FunctionCallingTest, loading_function_calling_test
 from .json_utils import escape_json_string
@@ -23,13 +23,13 @@ def generar_json_para_prompt(
     json_acumulado = ""
 
     literal_inicio = '{"prompt": "' + escape_json_string(prompt) + '", "name": "'
-    fragmento, input_ids = mask_literal(input_ids, model, literal_inicio, id_to_text)
+    fragmento, input_ids = write_literal(input_ids, model, literal_inicio)
     json_acumulado += fragmento
 
     nombre_funcion, input_ids = mask_name(input_ids, vocab, model, definitions, unknown_ids)
     json_acumulado += nombre_funcion
 
-    fragmento, input_ids = mask_literal(input_ids, model, '", "parameters": {', id_to_text)
+    fragmento, input_ids = write_literal(input_ids, model, '", "parameters": {')
     json_acumulado += fragmento
 
     funcion_elegida = name_to_def[nombre_funcion]
@@ -40,7 +40,7 @@ def generar_json_para_prompt(
         literal_clave = f'"{nombre_param}": '
         if esquema.type == "string":
             literal_clave += '"'
-        fragmento, input_ids = mask_literal(input_ids, model, literal_clave, id_to_text)
+        fragmento, input_ids = write_literal(input_ids, model, literal_clave)
         json_acumulado += fragmento
 
         if esquema.type == "number":
@@ -60,10 +60,10 @@ def generar_json_para_prompt(
         cierre = '}' if es_ultimo else ', '
         if esquema.type == "string":
             cierre = '"' + cierre
-        fragmento, input_ids = mask_literal(input_ids, model, cierre, id_to_text)
+        fragmento, input_ids = write_literal(input_ids, model, cierre)
         json_acumulado += fragmento
 
-    fragmento, input_ids = mask_literal(input_ids, model, '}', id_to_text)
+    fragmento, input_ids = write_literal(input_ids, model, '}')
     json_acumulado += fragmento
     try:
         resultado = json.loads(json_acumulado)

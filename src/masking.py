@@ -154,29 +154,12 @@ def mask_string(
     return (texto_generado, input_ids)
 
 
-def mask_literal(
+def write_literal(
     input_ids: list[int],
     model: Small_LLM_Model,
     text: str,
-    id_to_text: dict[int, str],
 ) -> tuple[str, list[int]]:
-    texto_generado = ""
+    """Añade a input_ids un texto fijo ya tokenizado, sin consultar al modelo."""
+    input_ids.extend(model.encode(text).tolist()[0])
+    return (text, input_ids)
 
-    while texto_generado != text:
-        logits = model.get_logits_from_input_ids(input_ids)
-        mask = list_creation(logits)
-        resto_esperado = text[len(texto_generado):]
-
-        for id, texto_candidato in id_to_text.items():
-            if texto_candidato and resto_esperado.startswith(texto_candidato):
-                mask[id] = logits[id]
-
-        winner_id = int(np.argmax(mask))
-        if mask[winner_id] == float('-inf'):
-            raise ValueError(
-                f"Ningún token puede producir el resto del literal: {resto_esperado!r}"
-            )
-        texto_generado += id_to_text[winner_id]
-        input_ids.append(winner_id)
-
-    return (texto_generado, input_ids)
