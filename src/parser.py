@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, ValidationError
+from typing import Any
 import json
 import sys
 
@@ -15,8 +16,16 @@ class FunctionDefinition(BaseModel):
 class FunctionCallingTest(BaseModel):
     prompt: str
 
-tests: list[FunctionCallingTest]
-definitions: list[FunctionDefinition]
+class FunctionCallResult(BaseModel):
+    prompt: str
+    name: str
+    parameters: dict[str, Any]
+
+
+class FunctionCallError(BaseModel):
+    prompt: str
+    error: str
+
 
 def loading_function_definitions(path: str) -> list[FunctionDefinition]:
     try:

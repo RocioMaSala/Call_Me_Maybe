@@ -1,12 +1,19 @@
 from llm_sdk import Small_LLM_Model
-from .tokenizer_utils import load_vocab, build_id_to_text, build_id_to_token, build_unknown_ids
-from .masking import mask_number, mask_string, mask_name, mask_boolean, write_literal
+from .tokenizer_utils import load_vocab, build_id_to_text
+from .tokenizer_utils import build_id_to_token, build_unknown_ids
+from .masking import mask_number, mask_string
+from .masking import mask_name, mask_boolean, write_literal
 from .prompting import build_prompt_compact, add_json_instruction
-from .parser import loading_function_definitions, build_name_to_def, FunctionDefinition, FunctionCallingTest, loading_function_calling_test
+from .parser import loading_function_definitions, build_name_to_def
+from .parser import FunctionDefinition, FunctionCallingTest
+from .parser import loading_function_calling_test, FunctionCallError
+from .parser import FunctionCallResult
 from .json_utils import escape_json_string
 import json
 import argparse
 import time
+import sys
+from typing import Any
 
 
 def generar_json_para_prompt(
@@ -22,11 +29,17 @@ def generar_json_para_prompt(
     input_ids = model.encode(contexto).tolist()[0]
     json_acumulado = ""
 
-    literal_inicio = '{"prompt": "' + escape_json_string(prompt) + '", "name": "'
+    literal_inicio = (
+        '{"prompt": "'
+        + escape_json_string(prompt)
+        + '", "name": "'
+    )
     fragmento, input_ids = write_literal(input_ids, model, literal_inicio)
     json_acumulado += fragmento
 
-    nombre_funcion, input_ids = mask_name(input_ids, vocab, model, definitions, unknown_ids)
+    nombre_funcion, input_ids = mask_name(
+        input_ids, vocab, model, definitions, unknown_ids
+        )
     json_acumulado += nombre_funcion
 
     fragmento, input_ids = write_literal(input_ids, model, '", "parameters": {')
@@ -66,11 +79,14 @@ def generar_json_para_prompt(
     fragmento, input_ids = write_literal(input_ids, model, '}')
     json_acumulado += fragmento
     try:
-        resultado = json.loads(json_acumulado)
+        resultado: dict[str, Any] = json.loads(json_acumulado)
     except json.JSONDecodeError as e:
         raise ValueError(
             f"JSON inválido: {e}. Texto generado: {json_acumulado!r}"
         ) from e
+    for nombre_param, esquema in parametros.items():
+        if esquema.type == "number":
+            resultado["parameters"][nombre_param] = float(resultado["parameters"][nombre_param])
     return resultado
 
 
@@ -98,9 +114,18 @@ def procesar_todos_los_prompts(
         print(f"[{n}/{len(tests)}] {estado} en {time.time() - inicio:.1f} s")
     return resultados
 
-def escribir_resultados(resultados: list[dict], ruta_salida: str) -> None:
+import sys
+
+def escribir_resultados(
+    resultados: list[FunctionCallResult | FunctionCallError], ruta_salida: str
+) -> None:
+    validos = [r.model_dump() for r in resultados if isinstance(r, FunctionCallResult)]
+    os.makedirs(os.path.dirname(ruta_salida) or ".", exist_ok=True)
     with open(ruta_salida, "w", encoding="utf-8") as f:
-        json.dump(resultados, f)
+        json.dump(validos, f, indent=4, ensure_ascii=False)
+    for r in resultados:
+        if isinstance(r, FunctionCallError):
+            print(f"ERROR en {r.prompt!r}: {r.error}", file=sys.stderr)
 
 
 def parse_args() -> argparse.Namespace:
