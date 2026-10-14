@@ -13,6 +13,7 @@ import json
 import argparse
 import time
 import sys
+import os
 from typing import Any
 
 
@@ -98,31 +99,50 @@ def procesar_todos_los_prompts(
     model: Small_LLM_Model,
     unknown_ids: list[int],
     id_to_text: dict[int, str],
-) -> list[dict]:
-    resultados = []
+) -> list[FunctionCallResult | FunctionCallError]:
+    resultados: list[FunctionCallResult | FunctionCallError] = []
     for n, test in enumerate(tests, start=1):
         inicio = time.time()
         try:
-            resultado = generar_json_para_prompt(
-                test.prompt, definitions, name_to_def, vocab, model, unknown_ids, id_to_text
+            datos = generar_json_para_prompt(
+                test.prompt, definitions, name_to_def,
+                vocab, model, unknown_ids, id_to_text,
             )
-            resultados.append(resultado)
+            resultado: FunctionCallResult | FunctionCallError = (
+                FunctionCallResult(**datos)
+            )
             estado = "ok"
         except Exception as e:
-            resultados.append({"prompt": test.prompt, "error": str(e)})
+            resultado = FunctionCallError(prompt=test.prompt, error=str(e))
             estado = "ERROR"
+        resultados.append(resultado)
         print(f"[{n}/{len(tests)}] {estado} en {time.time() - inicio:.1f} s")
     return resultados
 
-import sys
 
 def escribir_resultados(
-    resultados: list[FunctionCallResult | FunctionCallError], ruta_salida: str
+    resultados: list[FunctionCallResult | FunctionCallError],
+    ruta_salida: str,
 ) -> None:
-    validos = [r.model_dump() for r in resultados if isinstance(r, FunctionCallResult)]
+    validos = [r for r in resultados if isinstance(r, FunctionCallResult)]
+    bloques = []
+    for r in validos:
+        prompt = json.dumps(r.prompt, ensure_ascii=False)
+        nombre = json.dumps(r.name, ensure_ascii=False)
+        params = json.dumps(r.parameters, ensure_ascii=False)
+        bloques.append(
+            "    {\n"
+            f'        "prompt": {prompt},\n'
+            f'        "name": {nombre},\n'
+            f'        "parameters": {params}\n'
+            "    }"
+        )
     os.makedirs(os.path.dirname(ruta_salida) or ".", exist_ok=True)
     with open(ruta_salida, "w", encoding="utf-8") as f:
-        json.dump(validos, f, indent=4, ensure_ascii=False)
+        f.write("[\n" + ",\n".join(bloques) + "\n]\n")
+    if not validos:
+        print("AVISO: ningún resultado válido, el fichero queda vacío.",
+              file=sys.stderr)
     for r in resultados:
         if isinstance(r, FunctionCallError):
             print(f"ERROR en {r.prompt!r}: {r.error}", file=sys.stderr)
@@ -172,8 +192,6 @@ def main() -> None:
     resultados = procesar_todos_los_prompts(
         tests, definitions, name_to_def, vocab, model, unknown_ids, id_to_text
     )
-    print(f"Generación: {time.time() - inicio:.1f} s para {len(tests)} prompt(s)")
-
     escribir_resultados(resultados, args.output)
 
 

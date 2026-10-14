@@ -100,12 +100,16 @@ MAX_STRING_TOKENS = 60
 
 
 def es_cierre(texto: str) -> bool:
+    limpio = texto.replace('Ġ', ' ').replace('Ċ', '\n')
     return (
-        texto.startswith('"')
-        and '\\' not in texto
-        and '"' not in texto[1:]
-        and not any(c.isalnum() for c in texto[1:])
+        limpio.startswith('"')
+        and '\\' not in limpio
+        and '"' not in limpio[1:]
+        and not any(c.isalnum() for c in limpio[1:])
     )
+
+def solo_barras_pares(texto: str) -> bool:
+    return len(texto) > 0 and set(texto) == {'\\'} and len(texto) % 2 == 0
 
 def mask_string(
     input_ids: list[int],
@@ -128,6 +132,7 @@ def mask_string(
             )
 
         logits = model.get_logits_from_input_ids(input_ids)
+        crudos = list(logits)
         for i in unknown_ids:
             logits[i] = float('-inf')
 
@@ -136,6 +141,7 @@ def mask_string(
                 es_valido = (
                     es_cierre(texto_token)
                     or texto_token == '\\'
+                    or solo_barras_pares(texto_token)
                     or ('"' not in texto_token and '\\' not in texto_token)
                 )
             else:
@@ -144,6 +150,11 @@ def mask_string(
                 logits[id] = float('-inf')
 
         winner_id = int(np.argmax(logits))
+        if pasos <= 2:
+            top = sorted(range(len(crudos)), key=lambda i: crudos[i],
+                         reverse=True)[:6]
+            print("CRUDOS:", [id_to_token.get(i, '<esp>') for i in top],
+                  "->", id_to_token[winner_id])
         if not after_backslash and es_cierre(id_to_token[winner_id]):
             break
 
