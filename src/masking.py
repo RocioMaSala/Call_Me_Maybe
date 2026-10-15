@@ -42,8 +42,6 @@ def mask_name(
     id_to_token = build_id_to_token(vocab)
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
-        indices_ordenados = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
-        top_8 = indices_ordenados[:8]
         for i in unknown_ids:
             logits[i] = float('-inf')
         for texto_token, id in vocab.items():
@@ -61,7 +59,8 @@ def mask_name(
         if winner_id == quote_id and texto_generado in candidatos_vivos:
             break
         texto_generado += token_to_text(id_to_token, winner_id)
-        candidatos_vivos = [c for c in candidatos_vivos if c.startswith(texto_generado)]
+        candidatos_vivos = [c for c in candidatos_vivos if
+                            c.startswith(texto_generado)]
         input_ids.append(winner_id)
     return (texto_generado, input_ids)
 
@@ -75,7 +74,8 @@ def mask_number(
     texto_generado = ""
     comma_id = vocab[',']
     key_id = vocab['}']
-    digits_ids = [id for texto, id in vocab.items() if texto.isascii() and texto.isdigit()]
+    digits_ids = [id for texto, id in vocab.items()
+                  if texto.isascii() and texto.isdigit()]
 
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
@@ -92,11 +92,7 @@ def mask_number(
             break
         texto_generado += id_to_text[winner_id]
         input_ids.append(winner_id)
-
     return (texto_generado, input_ids)
-
-
-MAX_STRING_TOKENS = 60
 
 
 def es_cierre(texto: str) -> bool:
@@ -108,8 +104,10 @@ def es_cierre(texto: str) -> bool:
         and not any(c.isalnum() for c in limpio[1:])
     )
 
+
 def solo_barras_pares(texto: str) -> bool:
     return len(texto) > 0 and set(texto) == {'\\'} and len(texto) % 2 == 0
+
 
 def mask_string(
     input_ids: list[int],
@@ -121,18 +119,9 @@ def mask_string(
     barras_id = vocab['\\']
     id_to_token = build_id_to_token(vocab)
     after_backslash = False
-    pasos = 0
 
     while True:
-        pasos += 1
-        if pasos > MAX_STRING_TOKENS:
-            raise ValueError(
-                f"El string superó {MAX_STRING_TOKENS} tokens sin cerrarse: "
-                f"{texto_generado!r}"
-            )
-
         logits = model.get_logits_from_input_ids(input_ids)
-        crudos = list(logits)
         for i in unknown_ids:
             logits[i] = float('-inf')
 
@@ -145,16 +134,13 @@ def mask_string(
                     or ('"' not in texto_token and '\\' not in texto_token)
                 )
             else:
-                es_valido = texto_token in ['"', '\\', '/', 'b', 'f', 'n', 'r', 't']
+                es_valido = texto_token in ['"',
+                                            '\\', '/', 'b', 'f',
+                                            'n', 'r', 't']
             if not es_valido:
                 logits[id] = float('-inf')
 
         winner_id = int(np.argmax(logits))
-        if pasos <= 2:
-            top = sorted(range(len(crudos)), key=lambda i: crudos[i],
-                         reverse=True)[:6]
-            print("CRUDOS:", [id_to_token.get(i, '<esp>') for i in top],
-                  "->", id_to_token[winner_id])
         if not after_backslash and es_cierre(id_to_token[winner_id]):
             break
 
@@ -170,7 +156,5 @@ def write_literal(
     model: Small_LLM_Model,
     text: str,
 ) -> tuple[str, list[int]]:
-    """Añade a input_ids un texto fijo ya tokenizado, sin consultar al modelo."""
     input_ids.extend(model.encode(text).tolist()[0])
     return (text, input_ids)
-

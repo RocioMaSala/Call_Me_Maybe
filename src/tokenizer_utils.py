@@ -1,6 +1,7 @@
 import json
 from llm_sdk import Small_LLM_Model
 
+
 def load_vocab(model: Small_LLM_Model) -> dict[str, int]:
     vocab_path = model.get_path_to_vocab_file()
     with open(vocab_path, "r", encoding="utf-8") as f:
@@ -20,11 +21,12 @@ def token_to_text(id_to_token: dict[int, str], token_id: int) -> str:
     return texto_limpio
 
 
-def build_unknown_ids(id_to_token: dict[int, str], logits_size: int) -> list[int]:
+def build_unknown_ids(
+        id_to_token: dict[int, str], logits_size: int
+        ) -> list[int]:
     unknown_ids = [i for i in range(logits_size) if i not in id_to_token]
     return unknown_ids
 
 
 def build_id_to_text(id_to_token: dict[int, str]) -> dict[int, str]:
     return {id: token_to_text(id_to_token, id) for id in id_to_token}
-

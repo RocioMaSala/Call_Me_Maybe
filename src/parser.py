@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ValidationError
 from typing import Any
 import json
 import sys
@@ -7,14 +7,17 @@ import sys
 class ParameterSchema(BaseModel):
     type: str
 
+
 class FunctionDefinition(BaseModel):
     name: str
     description: str
     parameters: dict[str, ParameterSchema]
     returns: ParameterSchema
 
+
 class FunctionCallingTest(BaseModel):
     prompt: str
+
 
 class FunctionCallResult(BaseModel):
     prompt: str
@@ -34,20 +37,30 @@ def loading_function_definitions(path: str) -> list[FunctionDefinition]:
             definitions = []
             for item in raw_data:
                 parsed_item = FunctionDefinition(**item)
-                definitions.append(parsed_item)          
+                definitions.append(parsed_item)
             return definitions
     except FileNotFoundError:
         print(f"Error: no se encontró el fichero {path}", file=sys.stderr)
         sys.exit(1)
     except json.JSONDecodeError as e:
-        print(f"Error: el fichero {path} no contiene JSON válido: {e}", file=sys.stderr)
+        print(
+            f"Error: el fichero {path} no contiene "
+            f"JSON válido: {e}", file=sys.stderr
+            )
         sys.exit(1)
     except ValidationError as e:
-        print(f"Error: el fichero {path} no cumple el formato esperado: {e}", file=sys.stderr)
+        print(
+            f"Error: el fichero {path} no cumple el "
+            f"formato esperado: {e}", file=sys.stderr
+            )
         sys.exit(1)
 
-def build_name_to_def(definitions: list[FunctionDefinition]) -> dict[str, FunctionDefinition]:
+
+def build_name_to_def(
+        definitions: list[FunctionDefinition]
+        ) -> dict[str, FunctionDefinition]:
     return {func.name: func for func in definitions}
+
 
 def loading_function_calling_test(path: str) -> list[FunctionCallingTest]:
     try:
@@ -56,14 +69,20 @@ def loading_function_calling_test(path: str) -> list[FunctionCallingTest]:
             tests = []
             for item in raw_data:
                 parsed_item = FunctionCallingTest(**item)
-                tests.append(parsed_item)          
+                tests.append(parsed_item)
             return tests
     except OSError as e:
         print(e, file=sys.stderr)
         sys.exit(1)
     except json.JSONDecodeError as e:
-        print(f"Error: el fichero {path} no contiene JSON válido: {e}", file=sys.stderr)
+        print(
+            f"Error: el fichero {path} no contiene JSON válido: {e}",
+            file=sys.stderr
+            )
         sys.exit(1)
     except ValidationError as e:
-        print(f"Error: el fichero {path} no cumple el formato esperado: {e}", file=sys.stderr)
+        print(
+            f"Error: el fichero {path} no cumple el formato esperado: {e}",
+            file=sys.stderr
+            )
         sys.exit(1)

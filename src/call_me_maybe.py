@@ -43,7 +43,9 @@ def generar_json_para_prompt(
         )
     json_acumulado += nombre_funcion
 
-    fragmento, input_ids = write_literal(input_ids, model, '", "parameters": {')
+    fragmento, input_ids = write_literal(
+        input_ids, model, '", "parameters": {'
+        )
     json_acumulado += fragmento
 
     funcion_elegida = name_to_def[nombre_funcion]
@@ -61,7 +63,9 @@ def generar_json_para_prompt(
             valor, input_ids = mask_number(input_ids, vocab, model, id_to_text)
         elif esquema.type == "string":
             try:
-                valor, input_ids = mask_string(input_ids, vocab, model, unknown_ids)
+                valor, input_ids = mask_string(
+                    input_ids, vocab, model, unknown_ids
+                    )
             except ValueError as e:
                 raise ValueError(f"Parámetro {nombre_param!r}: {e}") from e
         elif esquema.type == "boolean":
@@ -87,7 +91,9 @@ def generar_json_para_prompt(
         ) from e
     for nombre_param, esquema in parametros.items():
         if esquema.type == "number":
-            resultado["parameters"][nombre_param] = float(resultado["parameters"][nombre_param])
+            resultado["parameters"][nombre_param] = float(
+                resultado["parameters"][nombre_param]
+                )
     return resultado
 
 
@@ -149,7 +155,9 @@ def escribir_resultados(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Function calling con constrained decoding")
+    parser = argparse.ArgumentParser(
+        description="Function calling con constrained decoding"
+        )
     parser.add_argument(
         "--functions_definition",
         type=str,
@@ -188,7 +196,6 @@ def main() -> None:
 
     name_to_def = build_name_to_def(definitions)
 
-    inicio = time.time()
     resultados = procesar_todos_los_prompts(
         tests, definitions, name_to_def, vocab, model, unknown_ids, id_to_text
     )
