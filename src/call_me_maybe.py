@@ -1,3 +1,4 @@
+"""Command-line entry point: generate function calls for every prompt."""
 from llm_sdk import Small_LLM_Model
 from .tokenizer_utils import load_vocab, build_id_to_text
 from .tokenizer_utils import build_id_to_token, build_unknown_ids
@@ -25,7 +26,34 @@ def generar_json_para_prompt(
     model: Small_LLM_Model,
     unknown_ids: list[int],
     id_to_text: dict[int, str],
-) -> dict[str, object]:
+) -> dict[str, Any]:
+    """Generate the function call for one prompt.
+
+    The JSON text is built in segments. Fixed text (keys, braces,
+    separators and the original prompt) is added with write_literal.
+    The function name and every argument value are generated with the
+    constrained-decoding functions of masking.py, according to the type
+    declared for each parameter. The final text is parsed with
+    json.loads, and the values of "number" parameters are converted to
+    float.
+
+    Args:
+        prompt: Request written in natural language.
+        definitions: The available functions.
+        name_to_def: Maps each function name to its definition.
+        vocab: Maps raw token strings to ids.
+        model: Model that returns the logits.
+        unknown_ids: Positions of the logits that have no text.
+        id_to_text: Maps each id to the real text of its token.
+
+    Returns:
+        A dictionary with the keys "prompt", "name" and "parameters".
+
+    Raises:
+        ValueError: If a parameter has a type that is not "number",
+            "string" or "boolean", or if the generated text is not
+            valid JSON.
+    """
     contexto = add_json_instruction(build_prompt_compact(prompt, definitions))
     input_ids = model.encode(contexto).tolist()[0]
     json_acumulado = ""
@@ -106,6 +134,24 @@ def procesar_todos_los_prompts(
     unknown_ids: list[int],
     id_to_text: dict[int, str],
 ) -> list[FunctionCallResult | FunctionCallError]:
+    """Generate a function call for every prompt.
+
+    A prompt that fails does not stop the others: its error is stored
+    as a FunctionCallError. A progress line with the time spent is
+    printed for each prompt.
+
+    Args:
+        tests: The prompts to process.
+        definitions: The available functions.
+        name_to_def: Maps each function name to its definition.
+        vocab: Maps raw token strings to ids.
+        model: Model that returns the logits.
+        unknown_ids: Positions of the logits that have no text.
+        id_to_text: Maps each id to the real text of its token.
+
+    Returns:
+        One result per prompt, in the same order as tests.
+    """
     resultados: list[FunctionCallResult | FunctionCallError] = []
     for n, test in enumerate(tests, start=1):
         inicio = time.time()
@@ -130,6 +176,18 @@ def escribir_resultados(
     resultados: list[FunctionCallResult | FunctionCallError],
     ruta_salida: str,
 ) -> None:
+    """Write the successful results to the output file.
+
+    The file is a JSON array. Each object is written by hand so that
+    "parameters" stays on one line. Prompts that failed are not written,
+    because the output may only have the keys "prompt", "name" and
+    "parameters". Their errors are printed on stderr instead. The output
+    folder is created if it does not exist.
+
+    Args:
+        resultados: The results of every prompt.
+        ruta_salida: Path of the output file.
+    """
     validos = [r for r in resultados if isinstance(r, FunctionCallResult)]
     bloques = []
     for r in validos:
@@ -155,6 +213,12 @@ def escribir_resultados(
 
 
 def parse_args() -> argparse.Namespace:
+    """Read the command-line arguments.
+
+    Returns:
+        The arguments --functions_definition, --input and --output,
+        each with a default path in data/input or data/output.
+    """
     parser = argparse.ArgumentParser(
         description="Function calling con constrained decoding"
         )
@@ -180,7 +244,21 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the whole program.
+
+    Loads the model and the vocabulary, reads the input files,
+    generates a function call for every prompt and writes the result.
+    """
     args = parse_args()
+
+    definitions = loading_function_definitions(args.functions_definition)
+    tests = loading_function_calling_test(args.input)
+    if not tests:
+        print(f"Error: {args.input} no contiene ningún prompt.",
+              file=sys.stderr)
+        sys.exit(1)
+
+    name_to_def = build_name_to_def(definitions)
 
     model = Small_LLM_Model()
     vocab = load_vocab(model)

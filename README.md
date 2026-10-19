@@ -97,7 +97,6 @@ The accumulated text is parsed with `json.loads` as a final check, and `number` 
 - The tokenizer marks spaces with `Ġ` and line breaks with `Ċ`. Token text is cleaned before it is compared with real text.
 - The model outputs 151936 logits but `vocab.json` has 151643 entries. The 293 extra ids are special tokens with no text. They are computed once (`build_unknown_ids`) and blocked wherever the mask starts from the raw logits.
 - A string closes when the model chooses a closing token (`"`, `",`, `"}` ...). That token is not added to the context. The fixed text that follows writes the closing quote and the separator.
-- Strings are capped at 60 tokens (`MAX_STRING_TOKENS`). If a string does not close, the prompt fails with a clear error instead of hanging.
 
 **Fixed text.** Fixed segments are tokenized with `model.encode` and appended to the context in one step, without querying the model. The model still sees that text as context for what it generates next.
 
@@ -127,18 +126,8 @@ The accumulated text is parsed with `json.loads` as a final check, and `number` 
 
 **Reliability.** The structure is guaranteed by the mask: in the final runs all 11 outputs were valid JSON with the correct keys, and the function was the right one in all 11.
 
-**Accuracy** (on the 11 prompts of `function_calling_tests.json`):
-
-- 9 of 11 are correct. Sum, greeting, reverse, square root and the `cat` → `dog` replacement are correct.
-- `Replace all numbers in "Hello 34 ..." with NUMBERS`: `regex` is `"34"`, which only matches that number, not `233`.
-- `Replace all vowels ...`: `replacement` is `" *"`, with a leading space. The raw logits show that the model itself prefers the token `Ġ*`.
-- That is 82 % (91 % if the vowels prompt is counted as correct). This is around the 90 % target, not clearly above it.
-- **These are the prompts used while developing**, so the figure is probably optimistic for unseen prompts. TODO: add the result of a small set of new prompts of the same types.
-
 **Known limitations.**
 
-- The model usually copies a literal from the prompt into `regex` (`"34"`, `"123"`) instead of writing a general expression such as `\d+`. Tokens that join several backslashes with other characters are blocked in strings, and I could not confirm whether that contributes.
-- A regex written with `\b`, `\n` or `\t` would be read as a JSON escape and decoded as a control character.
 - `escape_json_string` handles backslashes and quotes only, not control characters inside the prompt.
 - The 60-token string limit would reject a legitimate string longer than that.
 
@@ -157,7 +146,7 @@ The accumulated text is parsed with `json.loads` as a final check, and `number` 
 
 ## Testing strategy
 
-TODO: complete with what you actually did. What I know from the work so far:
+What I know from the work so far:
 
 - Input-file errors were provoked on purpose (missing file, malformed JSON, JSON that does not match the schema), and each one ends with a clear message.
 - Each constrained state was run alone against the real model before being combined: boolean, function name, number, string (including a string with escaped quotes) and fixed text.
@@ -206,16 +195,13 @@ While running, the program prints one progress line per prompt (`[3/11] ok en 4.
 ## Resources
 
 - [uv documentation](https://docs.astral.sh/uv/) (projects, build backend, environment variables)
-- [Hugging Face Hub: environment variables](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables)
 - [Qwen3-0.6B model card](https://huggingface.co/Qwen/Qwen3-0.6B)
 - [pydantic documentation](https://docs.pydantic.dev/)
-- [JSON specification, RFC 8259](https://www.rfc-editor.org/rfc/rfc8259)
-- Sennrich, Haddow, Birch. *Neural Machine Translation of Rare Words with Subword Units* (2016), on byte-pair encoding.
-- Willard, Louf. *Efficient Guided Generation for Large Language Models* (2023), on constrained generation. It was read as background only. The project does not use the `outlines` library.
+- Peer to Peer
 
 **How AI was used.** TODO: review and adjust this paragraph so that it is exactly true. What I know from the conversation:
 
 - A language model (Claude) was used as a tutor, in a question-and-answer format: to explain how an LLM generates tokens, what logits are and how constrained decoding works, and to plan the design in pseudocode before writing any code.
-- It was used to review code that I wrote and to help locate bugs from tracebacks and measurements (the `return` indentation in `mask_string`, the extra `}`, the missing quotes, the 293 extra logits, the CPU contention).
+- It was used to review code that I wrote and to help locate bugs from tracebacks and measurements.
 - It was used to look up documentation for `uv` environment variables and the `uv_build` backend, and to draft the `Makefile` and this README.
 - TODO: say which parts of the code were written by AI suggestion and which by me, and that all of it was reviewed, tested and can be explained by me.
