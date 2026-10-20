@@ -1,5 +1,5 @@
 """Pydantic models and loaders for the input and output data."""
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, ConfigDict
 from typing import Any
 import json
 import sys
@@ -23,6 +23,7 @@ class FunctionDefinition(BaseModel):
         parameters: Maps each parameter name to its type.
         returns: Type of the value the function returns.
     """
+    model_config = ConfigDict(extra="forbid")
     name: str
     description: str
     parameters: dict[str, ParameterSchema]
@@ -35,6 +36,7 @@ class FunctionCallingTest(BaseModel):
     Attributes:
         prompt: The request written in natural language.
     """
+    model_config = ConfigDict(extra="forbid")
     prompt: str
 
 

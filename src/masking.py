@@ -1,7 +1,7 @@
 
 """Constrained-decoding functions: one per type of value to generate."""
 import numpy as np
-from .tokenizer_utils import token_to_text, build_id_to_token
+from .tokenizer_utils import build_id_to_token
 from llm_sdk import Small_LLM_Model
 from .parser import FunctionDefinition
 
@@ -70,7 +70,7 @@ def mask_name(
     Args:
         input_ids: Token ids of the context. It is modified in place.
         vocab: Maps raw token strings to ids.
-        model: Model that returns the logits.
+        model: Model that returns the logits and decodes the ids.
         functions: The available functions.
         unknown_ids: Positions of the logits that have no text.
 
@@ -80,9 +80,9 @@ def mask_name(
     candidatos_vivos = []
     for function in functions:
         candidatos_vivos.append(function.name)
+    ids_generados: list[int] = []
     texto_generado = ""
     quote_id = vocab['"']
-    id_to_token = build_id_to_token(vocab)
     while True:
         logits = model.get_logits_from_input_ids(input_ids)
         for i in unknown_ids:
@@ -101,7 +101,8 @@ def mask_name(
         winner_id = int(np.argmax(logits))
         if winner_id == quote_id and texto_generado in candidatos_vivos:
             break
-        texto_generado += token_to_text(id_to_token, winner_id)
+        ids_generados.append(winner_id)
+        texto_generado = model.decode(ids_generados)
         candidatos_vivos = [c for c in candidatos_vivos if
                             c.startswith(texto_generado)]
         input_ids.append(winner_id)
@@ -112,7 +113,6 @@ def mask_number(
     input_ids: list[int],
     vocab: dict[str, int],
     model: Small_LLM_Model,
-    id_to_text: dict[int, str],
 ) -> tuple[str, list[int]]:
     """Generate a number, one digit at a time.
 
@@ -127,13 +127,12 @@ def mask_number(
     Args:
         input_ids: Token ids of the context. It is modified in place.
         vocab: Maps raw token strings to ids.
-        model: Model that returns the logits.
-        id_to_text: Maps each id to the real text of its token.
+        model: Model that returns the logits and decodes the ids.
 
     Returns:
         The digits generated, as a string, and input_ids.
     """
-    texto_generado = ""
+    ids_generados: list[int] = []
     comma_id = vocab[',']
     key_id = vocab['}']
     digits_ids = [id for texto, id in vocab.items()
@@ -145,16 +144,16 @@ def mask_number(
 
         for id in digits_ids:
             mask[id] = logits[id]
-        if len(texto_generado) > 0:
+        if len(ids_generados) > 0:
             mask[comma_id] = logits[comma_id]
             mask[key_id] = logits[key_id]
 
         winner_id = int(np.argmax(mask))
         if winner_id == comma_id or winner_id == key_id:
             break
-        texto_generado += id_to_text[winner_id]
+        ids_generados.append(winner_id)
         input_ids.append(winner_id)
-    return (texto_generado, input_ids)
+    return (model.decode(ids_generados), input_ids)
 
 
 def es_cierre(texto: str) -> bool:
@@ -220,7 +219,7 @@ def mask_string(
     Returns:
         The text generated, without the closing quote, and input_ids.
     """
-    texto_generado = ""
+    ids_generados: list[int] = []
     barras_id = vocab['\\']
     id_to_token = build_id_to_token(vocab)
     after_backslash = False
@@ -249,11 +248,11 @@ def mask_string(
         if not after_backslash and es_cierre(id_to_token[winner_id]):
             break
 
-        texto_generado += token_to_text(id_to_token, winner_id)
+        ids_generados.append(winner_id)
         input_ids.append(winner_id)
         after_backslash = (winner_id == barras_id) and not after_backslash
 
-    return (texto_generado, input_ids)
+    return (model.decode(ids_generados), input_ids)
 
 
 def write_literal(

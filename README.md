@@ -104,7 +104,7 @@ The accumulated text is parsed with `json.loads` as a final check, and `number` 
 
 - **Masking the whole vocabulary, not a top-N.** I tried sorting the logits and accepting the first valid token among the top 8 and then the top 30. It failed: at the point where the output must start with `{`, that token was at position 134 of the ranking (the top candidates were conversational continuations such as `Please` or `What`). Masking the full vocabulary always finds a valid token, wherever it ranks, and it follows the algorithm described in the subject.
 - **Fixed JSON text is written with `encode`, not forced token by token through the model.** The first version forced every character through the model. A full run of the 11 test prompts took 291.6 s and 300.5 s in two runs, at or above the 5-minute limit. Writing the fixed segments with `encode` brought it to 81.5 s. The model still decides the function name and every argument value.
-- **Number type.** Values declared as `number` are written as floats (`2.0`), as in the example of the subject.
+- **Number type.** “Numbers are written as integers. JSON has a single number type, so 2 and 2.0 are both valid values for a number parameter.”
 - **Failed prompts.** If a prompt fails, its error is printed on `stderr` and the prompt is left out of the output file, because the subject forbids extra keys in the output. The other prompts are still processed.
 - **Output format.** `escribir_resultados` writes each object by hand, passing every value through `json.dumps`, so that `parameters` stays on one line as in the subject's example.
 - **Pydantic.** All data classes (`FunctionDefinition`, `ParameterSchema`, `FunctionCallingTest`, `FunctionCallResult`, `FunctionCallError`) use pydantic. Input files are validated, and invalid or missing files stop the program with a clear message.
@@ -180,7 +180,7 @@ Example output:
     {
         "prompt": "What is the sum of 265 and 345?",
         "name": "fn_add_numbers",
-        "parameters": {"a": 265.0, "b": 345.0}
+        "parameters": {"a": 265, "b": 345}
     },
     {
         "prompt": "Greet shrek",

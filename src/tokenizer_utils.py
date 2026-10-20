@@ -35,29 +35,6 @@ def build_id_to_token(vocab: dict[str, int]) -> dict[int, str]:
     return id_to_token
 
 
-def token_to_text(id_to_token: dict[int, str], token_id: int) -> str:
-    """Return the real text of a token.
-
-    The tokenizer writes a space as 'Ġ' and a line break as 'Ċ'. Both
-    markers are replaced by the characters they stand for. Other special
-    markers are not converted.
-
-    Args:
-        id_to_token: Dictionary that maps ids to raw token strings.
-        token_id: Id of the token.
-
-    Returns:
-        The text of the token, with spaces and line breaks restored.
-
-    Raises:
-        KeyError: If the id is not in the dictionary.
-    """
-    texto_crudo = id_to_token[token_id]
-    texto_limpio = texto_crudo.replace('Ġ', ' ')
-    texto_limpio = texto_limpio.replace('Ċ', '\n')
-    return texto_limpio
-
-
 def build_unknown_ids(
         id_to_token: dict[int, str], logits_size: int
         ) -> list[int]:
@@ -76,19 +53,3 @@ def build_unknown_ids(
     """
     unknown_ids = [i for i in range(logits_size) if i not in id_to_token]
     return unknown_ids
-
-
-def build_id_to_text(id_to_token: dict[int, str]) -> dict[int, str]:
-    """Convert every token to its real text, once.
-
-    The result is computed a single time so the generation loops do not
-    clean the same token again at every step.
-
-    Args:
-        id_to_token: Dictionary that maps ids to raw token strings.
-
-    Returns:
-        A dictionary that maps each id to the text of its token, with
-        spaces and line breaks restored.
-    """
-    return {id: token_to_text(id_to_token, id) for id in id_to_token}

@@ -1,14 +1,27 @@
 """Command-line entry point: generate function calls for every prompt."""
 from llm_sdk import Small_LLM_Model
-from .tokenizer_utils import load_vocab, build_id_to_text
-from .tokenizer_utils import build_id_to_token, build_unknown_ids
-from .masking import mask_number, mask_string
-from .masking import mask_name, mask_boolean, write_literal
+from .tokenizer_utils import (
+    load_vocab,
+    build_id_to_token,
+    build_unknown_ids,
+)
+from .masking import (
+    mask_number,
+    mask_string,
+    mask_name,
+    mask_boolean,
+    write_literal
+)
 from .prompting import build_prompt_compact, add_json_instruction
-from .parser import loading_function_definitions, build_name_to_def
-from .parser import FunctionDefinition, FunctionCallingTest
-from .parser import loading_function_calling_test, FunctionCallError
-from .parser import FunctionCallResult
+from .parser import (
+    loading_function_definitions,
+    build_name_to_def,
+    FunctionDefinition,
+    FunctionCallingTest,
+    loading_function_calling_test,
+    FunctionCallError,
+    FunctionCallResult,
+)
 from .json_utils import escape_json_string
 import json
 import argparse
@@ -25,7 +38,6 @@ def generar_json_para_prompt(
     vocab: dict[str, int],
     model: Small_LLM_Model,
     unknown_ids: list[int],
-    id_to_text: dict[int, str],
 ) -> dict[str, Any]:
     """Generate the function call for one prompt.
 
@@ -44,7 +56,6 @@ def generar_json_para_prompt(
         vocab: Maps raw token strings to ids.
         model: Model that returns the logits.
         unknown_ids: Positions of the logits that have no text.
-        id_to_text: Maps each id to the real text of its token.
 
     Returns:
         A dictionary with the keys "prompt", "name" and "parameters".
@@ -87,8 +98,8 @@ def generar_json_para_prompt(
         fragmento, input_ids = write_literal(input_ids, model, literal_clave)
         json_acumulado += fragmento
 
-        if esquema.type == "number":
-            valor, input_ids = mask_number(input_ids, vocab, model, id_to_text)
+        if esquema.type == "number" or esquema.type == "integer":
+            valor, input_ids = mask_number(input_ids, vocab, model)
         elif esquema.type == "string":
             try:
                 valor, input_ids = mask_string(
@@ -109,7 +120,8 @@ def generar_json_para_prompt(
         fragmento, input_ids = write_literal(input_ids, model, cierre)
         json_acumulado += fragmento
 
-    fragmento, input_ids = write_literal(input_ids, model, '}')
+    cierre_final = '}' if total > 0 else '}}'
+    fragmento, input_ids = write_literal(input_ids, model, cierre_final)
     json_acumulado += fragmento
     try:
         resultado: dict[str, Any] = json.loads(json_acumulado)
@@ -117,11 +129,6 @@ def generar_json_para_prompt(
         raise ValueError(
             f"JSON inválido: {e}. Texto generado: {json_acumulado!r}"
         ) from e
-    for nombre_param, esquema in parametros.items():
-        if esquema.type == "number":
-            resultado["parameters"][nombre_param] = float(
-                resultado["parameters"][nombre_param]
-                )
     return resultado
 
 
@@ -132,7 +139,6 @@ def procesar_todos_los_prompts(
     vocab: dict[str, int],
     model: Small_LLM_Model,
     unknown_ids: list[int],
-    id_to_text: dict[int, str],
 ) -> list[FunctionCallResult | FunctionCallError]:
     """Generate a function call for every prompt.
 
@@ -147,7 +153,6 @@ def procesar_todos_los_prompts(
         vocab: Maps raw token strings to ids.
         model: Model that returns the logits.
         unknown_ids: Positions of the logits that have no text.
-        id_to_text: Maps each id to the real text of its token.
 
     Returns:
         One result per prompt, in the same order as tests.
@@ -158,7 +163,7 @@ def procesar_todos_los_prompts(
         try:
             datos = generar_json_para_prompt(
                 test.prompt, definitions, name_to_def,
-                vocab, model, unknown_ids, id_to_text,
+                vocab, model, unknown_ids,
             )
             resultado: FunctionCallResult | FunctionCallError = (
                 FunctionCallResult(**datos)
@@ -207,9 +212,9 @@ def escribir_resultados(
     if not validos:
         print("AVISO: ningún resultado válido, el fichero queda vacío.",
               file=sys.stderr)
-    for r in resultados:
-        if isinstance(r, FunctionCallError):
-            print(f"ERROR en {r.prompt!r}: {r.error}", file=sys.stderr)
+    for fail in resultados:
+        if isinstance(fail, FunctionCallError):
+            print(f"ERROR en {fail.prompt!r}: {fail.error}", file=sys.stderr)
 
 
 def parse_args() -> argparse.Namespace:
@@ -226,19 +231,16 @@ def parse_args() -> argparse.Namespace:
         "--functions_definition",
         type=str,
         default="data/input/functions_definition.json",
-        help="Ruta al fichero de definición de funciones",
     )
     parser.add_argument(
         "--input",
         type=str,
         default="data/input/function_calling_tests.json",
-        help="Ruta al fichero de prompts de entrada",
     )
     parser.add_argument(
         "--output",
         type=str,
         default="data/output/function_calling_results.json",
-        help="Ruta al fichero de salida",
     )
     return parser.parse_args()
 
@@ -263,7 +265,6 @@ def main() -> None:
     model = Small_LLM_Model()
     vocab = load_vocab(model)
     id_to_token = build_id_to_token(vocab)
-    id_to_text = build_id_to_text(id_to_token)
 
     probe_ids = model.encode("Test").tolist()[0]
     logits_size = len(model.get_logits_from_input_ids(probe_ids))
@@ -275,7 +276,7 @@ def main() -> None:
     name_to_def = build_name_to_def(definitions)
 
     resultados = procesar_todos_los_prompts(
-        tests, definitions, name_to_def, vocab, model, unknown_ids, id_to_text
+        tests, definitions, name_to_def, vocab, model, unknown_ids
     )
     escribir_resultados(resultados, args.output)
 

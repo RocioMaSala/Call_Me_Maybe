@@ -3,13 +3,16 @@
     "prompt": "What is the sum of 2 and 3?"
   },
   {
+    "boli": "jejejeje"
+  },
+  {
     "prompt": "What is the sum of 265 and 345?"
   },
   {
     "prompt": "Greet shrek"
   },
   {
-    "prompt": "Greet john"
+    "prompt": "Greet jn"
   },
   {
     "prompt": "Reverse the string 'hello'"
