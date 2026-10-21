@@ -270,11 +270,6 @@ def main() -> None:
     logits_size = len(model.get_logits_from_input_ids(probe_ids))
     unknown_ids = build_unknown_ids(id_to_token, logits_size)
 
-    definitions = loading_function_definitions(args.functions_definition)
-    tests = loading_function_calling_test(args.input)
-
-    name_to_def = build_name_to_def(definitions)
-
     resultados = procesar_todos_los_prompts(
         tests, definitions, name_to_def, vocab, model, unknown_ids
     )

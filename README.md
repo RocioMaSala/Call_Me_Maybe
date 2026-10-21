@@ -9,7 +9,7 @@ Function calling with a small language model (Qwen3-0.6B) using constrained deco
 **Goal.** Given a natural-language prompt such as `"What is the sum of 40 and 2?"`, the program does not answer the question. It returns the function call that would solve it: the function name and its arguments with the right types.
 
 ```json
-{"prompt": "What is the sum of 2 and 3?", "name": "fn_add_numbers", "parameters": {"a": 2.0, "b": 3.0}}
+{"prompt": "What is the sum of 2 and 3?", "name": "fn_add_numbers", "parameters": {"a": 2, "b": 3}}
 ```
 
 **Overview.** A 0.6B-parameter model is unreliable at producing JSON when it is only prompted for it. This project does not rely on the prompt for structure. At every generation step the logits returned by the model are modified *before* a token is chosen, so that only tokens that keep the output valid JSON and compliant with the function schema can be selected. The model decides the content (which function, which values). The code guarantees the structure.
@@ -43,7 +43,7 @@ uv run python -m src \
     --output data/output/function_calling_results.json
 ```
 
-or `make run ARGS="--input data/input/un_solo_prompt.json"`.
+or `make run ARGS="--input data/input/function_calling_tests.json"`.
 
 **Disk space (optional, 42 campus).** The model weights (about 1.5 GB), the virtual environment and the uv cache can exceed a small `$HOME` quota. They are redirected with environment variables, not with `pyproject.toml`, because the paths depend on each user's login:
 
@@ -81,7 +81,7 @@ llm_sdk/             provided SDK (local dependency)
 4. For each parameter of the chosen function: the fixed key `"<name>": `, then the **value** (constrained by its declared type), then a fixed separator.
 5. Fixed text: `}`
 
-The accumulated text is parsed with `json.loads` as a final check, and `number` values are converted to `float`.
+The accumulated text is parsed with `json.loads` as a final check.
 
 **Constraints by state.**
 
@@ -104,7 +104,7 @@ The accumulated text is parsed with `json.loads` as a final check, and `number` 
 
 - **Masking the whole vocabulary, not a top-N.** I tried sorting the logits and accepting the first valid token among the top 8 and then the top 30. It failed: at the point where the output must start with `{`, that token was at position 134 of the ranking (the top candidates were conversational continuations such as `Please` or `What`). Masking the full vocabulary always finds a valid token, wherever it ranks, and it follows the algorithm described in the subject.
 - **Fixed JSON text is written with `encode`, not forced token by token through the model.** The first version forced every character through the model. A full run of the 11 test prompts took 291.6 s and 300.5 s in two runs, at or above the 5-minute limit. Writing the fixed segments with `encode` brought it to 81.5 s. The model still decides the function name and every argument value.
-- **Number type.** “Numbers are written as integers. JSON has a single number type, so 2 and 2.0 are both valid values for a number parameter.”
+- **Number type.** Numbers are written as integers. JSON has a single number type, so 2 and 2.0 are both valid values for a number parameter.
 - **Failed prompts.** If a prompt fails, its error is printed on `stderr` and the prompt is left out of the output file, because the subject forbids extra keys in the output. The other prompts are still processed.
 - **Output format.** `escribir_resultados` writes each object by hand, passing every value through `json.dumps`, so that `parameters` stays on one line as in the subject's example.
 - **Pydantic.** All data classes (`FunctionDefinition`, `ParameterSchema`, `FunctionCallingTest`, `FunctionCallResult`, `FunctionCallError`) use pydantic. Input files are validated, and invalid or missing files stop the program with a clear message.
@@ -128,8 +128,11 @@ The accumulated text is parsed with `json.loads` as a final check, and `number` 
 
 **Known limitations.**
 
-- `escape_json_string` handles backslashes and quotes only, not control characters inside the prompt.
-- The 60-token string limit would reject a legitimate string longer than that.
+- Parameters can only be `number`, `integer`, `string` or `boolean`. Any other type makes that prompt fail.
+- Numbers: only non-negative integers are generated, with no minus sign or decimal point.
+- A string or a number that never closes is not stopped, and the program keeps generating.
+- `escape_json_string` handles backslashes and quotes only, not line breaks or tabs inside the prompt.
+- A prompt that fails is left out of the output file, so the file can have fewer entries than the input.
 
 ## Challenges faced
 
@@ -153,7 +156,7 @@ What I know from the work so far:
 - The 11 prompts were run, and the output file was loaded with `json.load` and checked for the exact keys `prompt`, `name` and `parameters`.
 - Raw logits were inspected at specific steps to understand why the model chose or rejected a token.
 - `flake8` and `mypy` with the flags of the subject (`make lint`).
-- TODO: say whether there is an automated test suite. If there is none, say so.
+- There is no automated test suite. Validation was done with the manual runs described above.
 
 ## Example usage
 
@@ -199,9 +202,8 @@ While running, the program prints one progress line per prompt (`[3/11] ok en 4.
 - [pydantic documentation](https://docs.pydantic.dev/)
 - Peer to Peer
 
-**How AI was used.** TODO: review and adjust this paragraph so that it is exactly true. What I know from the conversation:
+**How AI was used.**
 
-- A language model (Claude) was used as a tutor, in a question-and-answer format: to explain how an LLM generates tokens, what logits are and how constrained decoding works, and to plan the design in pseudocode before writing any code.
+- A language model (Claude) was used as a tutor, in a question-and-answer format: to explain how an LLM generates tokens, what logits are and how constrained decoding works.
 - It was used to review code that I wrote and to help locate bugs from tracebacks and measurements.
 - It was used to look up documentation for `uv` environment variables and the `uv_build` backend, and to draft the `Makefile` and this README.
-- TODO: say which parts of the code were written by AI suggestion and which by me, and that all of it was reviewed, tested and can be explained by me.

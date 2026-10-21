@@ -5,8 +5,6 @@ from .tokenizer_utils import build_id_to_token
 from llm_sdk import Small_LLM_Model
 from .parser import FunctionDefinition
 
-MAX_STRING_TOKENS = 60
-
 
 def list_creation(logits: list[float]) -> list[float]:
     """Create a mask in which every token is blocked.
